@@ -2,7 +2,7 @@
 set -euo pipefail
 
 factorial() {
-    local input=${1-} n result=1 i
+    local input=${1-} n result=0 i
     if [[ ! $input =~ ^(0|[1-9][0-9]?)$ ]]; then
         printf 'Expected an integer from 0 to 20\n' >&2
         return 2
