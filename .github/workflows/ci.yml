@@ -1,0 +1,78 @@
+name: Factorial CI variant 4
+
+on:
+  push:
+    paths-ignore: ['**.md']
+  pull_request:
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-dev.txt
+      - run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Static analysis
+        run: |
+          shellcheck -x bash/*.sh
+          flake8 python
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-dev.txt
+      - name: Bash tests
+        run: mkdir -p reports && bash bash/test.sh | tee reports/bash.tap
+      - name: Python tests and coverage
+        working-directory: python
+        run: >-
+          python -m pytest -v --junitxml=../reports/python.xml
+          --cov=main --cov-branch --cov-fail-under=100
+          --cov-report=xml:../reports/coverage.xml
+          --cov-report=html:../reports/htmlcov --cov-report=term-missing
+      - name: Package source
+        run: >-
+          tar --exclude=__pycache__ --exclude=.pytest_cache --exclude=.coverage
+          -czf factorial-4.tar.gz bash python Dockerfile requirements-dev.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: factorial-4
+          path: factorial-4.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports-4
+          path: reports/
+          if-no-files-found: error
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test Bash image
+        run: |
+          docker build --target bash-project -t factorial-bash:4 .
+          test "$(docker run --rm factorial-bash:4 5)" = 120
+      - name: Build and test Python image
+        run: |
+          docker build --target python-project -t factorial-python:4 .
+          test "$(docker run --rm factorial-python:4 5)" = 120

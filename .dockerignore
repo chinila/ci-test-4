@@ -1,0 +1,8 @@
+.git
+.github
+.venv
+reports
+**/__pycache__
+**/.pytest_cache
+**/.coverage
+*.tar.gz
